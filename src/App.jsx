@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Lock, 
@@ -28,7 +28,14 @@ import {
   ExternalLink,
   Shield,
   Activity,
-  Briefcase
+  Briefcase,
+  MapPin,
+  SlidersHorizontal,
+  ShieldAlert,
+  Mic,
+  MicOff,
+  Languages,
+  AlertOctagon
 } from 'lucide-react';
 
 // --- INITIAL MOCK DATA ---
@@ -120,31 +127,113 @@ const INITIAL_ESCROW_TXS = [
     supplierId: 'SUP-4412',
     supplierWallet: '8872103922',
     grossAmount: 120000,
-    commissionPct: 2.5,
-    commissionAmt: 3000,
-    netPayout: 117000,
-    status: 'HELD_IN_ESCROW', // HELD_IN_ESCROW, RELEASED, REFUNDED
+    commissionPct: 1.0,
+    commissionAmt: 1200,
+    netPayout: 118800,
+    status: 'HELD_IN_ESCROW',
+    frozen: false,
+    penaltyApplied: false,
     timestamp: '2026-09-17 14:22 UTC'
   }
 ];
 
+// Mock Translations Database for Demonstration
+const MOCK_TRANSLATIONS = {
+  Urdu: {
+    "🔒 Encrypted Chat Channel Opened. Off-platform contact sharing triggers automatic 20% security audit escrow freeze.": "🔒 محفوظ بات چیت کا چینل کھل گیا۔ پلیٹ فارم سے باہر رابطے کا تبادلہ 20٪ سیکورٹی آڈٹ اسکرو فریز کو متحرک کرے گا۔",
+    "We are looking to secure 10,000 units of ARM-x64 micro-controllers.": "ہم ARM-x64 مائیکرو کنٹرولرز کے 10,000 یونٹس حاصل کرنے کے خواہاں ہیں۔",
+    "We can accommodate this volume with a 10-day production lead time.": "ہم 10 دن کے پروڈکشن لیڈ ٹائم کے ساتھ اس مقدار کو پورا کر سکتے ہیں۔"
+  },
+  Hindi: {
+    "🔒 Encrypted Chat Channel Opened. Off-platform contact sharing triggers automatic 20% security audit escrow freeze.": "🔒 एनक्रिप्टेड चैट चैनल खुला। प्लेटफॉर्म से बाहर संपर्क साझा करने पर 20% सुरक्षा ऑडिट एस्क्रो फ्रीज लागू होगा।",
+    "We are looking to secure 10,000 units of ARM-x64 micro-controllers.": "हम ARM-x64 माइक्रो-कंट्रोलर के 10,000 यूनिट खरीदना चाहते हैं।",
+    "We can accommodate this volume with a 10-day production lead time.": "हम 10-दिन के उत्पादन समय के साथ इस मात्रा को पूरा कर सकते हैं।"
+  },
+  Chinese: {
+    "🔒 Encrypted Chat Channel Opened. Off-platform contact sharing triggers automatic 20% security audit escrow freeze.": "🔒 加密聊天通道已开启。平台外联系方式共享将触发自动 20% 安全审计托管冻结。",
+    "We are looking to secure 10,000 units of ARM-x64 micro-controllers.": "我们希望购买 10,000 个 ARM-x64 微控制器。",
+    "We can accommodate this volume with a 10-day production lead time.": "我们可以满足此采购量，生产周期为 10 天。"
+  },
+  Arabic: {
+    "🔒 Encrypted Chat Channel Opened. Off-platform contact sharing triggers automatic 20% security audit escrow freeze.": "🔒 تم فتح قناة الدردشة المشفرة. مشاركة معلومات الاتصال خارج المنصة تؤدي إلى تجميد 20% من الضمان التلقائي تدقيقاً للأمان.",
+    "We are looking to secure 10,000 units of ARM-x64 micro-controllers.": "نحن نتطلع إلى تأمين 10,000 وحدة من متحكمات ARM-x64 الدقيقة.",
+    "We can accommodate this volume with a 10-day production lead time.": "يمكننا تلبية هذه الكمية مع مهلة إنتاج مدتها 10 أيام."
+  }
+};
+
+// --- HELPER FUNCTION: TIERED COMMISSION CALCULATOR ---
+const calculateTieredCommission = (grossAmount) => {
+  if (grossAmount < 10000) {
+    const pct = 5.0;
+    const amt = (grossAmount * pct) / 100;
+    return { pct, amt, net: grossAmount - amt };
+  } else if (grossAmount <= 100000) {
+    const pct = 3.0;
+    const amt = (grossAmount * pct) / 100;
+    return { pct, amt, net: grossAmount - amt };
+  } else {
+    const pct = 1.0;
+    const amt = (grossAmount * pct) / 100;
+    return { pct, amt, net: grossAmount - amt };
+  }
+};
+
 export default function App() {
+  // Global Dynamic SEO Injection
+  useEffect(() => {
+    document.title = "Ghouri B2B | Global Wholesale B2B Marketplace & Verified Manufacturers";
+    
+    const setMeta = (name, content, attr = 'name') => {
+      let element = document.querySelector(`meta[${attr}="${name}"]`);
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attr, name);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', content);
+    };
+
+    setMeta('description', 'Ghouri B2B is the premier global wholesale B2B marketplace. Connect with verified international manufacturers, request quotes with MOQ details, and secure cross-border trade via Binance Pay USDT escrow.');
+    setMeta('keywords', 'global B2B marketplace, verified manufacturers, international trade, wholesale platform, B2B wholesale, global logistics, multi-sig escrow, supplier directory');
+    setMeta('robots', 'index, follow');
+
+    setMeta('og:title', 'Ghouri B2B | Global Wholesale B2B Marketplace & Verified Manufacturers', 'property');
+    setMeta('og:description', 'Connect with verified global manufacturers and secure trade with multi-sig escrow on Ghouri B2B Marketplace.', 'property');
+    setMeta('og:type', 'website', 'property');
+    setMeta('og:site_name', 'Ghouri B2B Marketplace', 'property');
+  }, []);
+
   // Navigation State
   const [activeTab, setActiveTab] = useState('landing');
   
-  // Auth State
+  // Auth State with Strict Role Control
   const [user, setUser] = useState(null); // { name, role: 'Buyer' | 'Supplier' | 'Admin', wallet, status }
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'signup'
+  const [authMode, setAuthMode] = useState('login');
   const [authRole, setAuthRole] = useState('Buyer');
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+
+  // Search & Filter State for Marketplace
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedRegion, setSelectedRegion] = useState('All');
 
   // Core Data States
   const [suppliers, setSuppliers] = useState(INITIAL_SUPPLIERS);
   const [rfqs, setRfqs] = useState(INITIAL_RFQS);
   const [escrowTxs, setEscrowTxs] = useState(INITIAL_ESCROW_TXS);
   
+  // Anti-Fraud Freeze Banner & Security States
+  const [fraudWarningBanner, setFraudWarningBanner] = useState(null);
+
+  // Auto-Translate Chat State
+  const [chatLanguage, setChatLanguage] = useState('English'); // English, Urdu, Hindi, Chinese, Arabic
+  const [autoTranslateEnabled, setAutoTranslateEnabled] = useState(false);
+
+  // Voice Speech Recognition Input State
+  const [isListening, setIsListening] = useState(false);
+
   // KYC Fast-Track Application States
   const [kycForm, setKycForm] = useState({
     entityName: '',
@@ -173,7 +262,10 @@ export default function App() {
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Login handler
+  // Authenticated Role Access Security Check
+  const isAdminAuthorized = user && user.role === 'Admin';
+
+  // Login Handler with Role Separation Verification
   const handleAuth = (e) => {
     e.preventDefault();
     if (!authEmail) return;
@@ -185,7 +277,7 @@ export default function App() {
         wallet: '1232772030',
         status: 'Superuser'
       });
-      showToast('Logged in as Platform Master Admin', 'success');
+      showToast('Authenticated as Platform Master Admin', 'success');
     } else {
       setUser({
         name: authEmail.split('@')[0] || 'Enterprise User',
@@ -201,36 +293,122 @@ export default function App() {
   const handleLogout = () => {
     setUser(null);
     showToast('Signed out of session', 'info');
-    setActiveTab('landing');
+    if (activeTab === 'admin') setActiveTab('landing');
   };
 
-  // Chat message send handler
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return;
-    
-    // Check anti-fraud pattern (e.g. phone/email/telegram detection)
-    const antiFraudRegex = /(?:phone|whatsapp|telegram|email|@|\+?\d{8,})/i;
-    if (antiFraudRegex.test(newMessage)) {
-      showToast('⚠️ WARNING: Off-platform communication flags account for 20% penalty freeze!', 'warning');
-    }
+  // ANTI-FRAUD DETECTION & VOICE / CHAT EVALUATOR
+  const detectOffPlatformContact = (text) => {
+    // Regex for phone numbers, emails, WhatsApp, Telegram, Skype, Wechat, etc.
+    const antiFraudRegex = /(?:phone|whatsapp|telegram|skype|wechat|email|gmail|yahoo|@|\+?\d[\d\s\-]{7,}\d|wa\.me|t\.me)/i;
+    return antiFraudRegex.test(text);
+  };
 
+  const handleSecurityPenaltyTrigger = (detectedText) => {
+    // 1. Show persistent alert banner
+    setFraudWarningBanner({
+      rfqId: selectedRfq.id,
+      detectedText: detectedText,
+      timestamp: new Date().toLocaleTimeString()
+    });
+
+    // 2. Enforce 20% Security Penalty Freeze across Escrow Txs & RFQs
+    setEscrowTxs(prev => prev.map(tx => {
+      if (tx.rfqId === selectedRfq.id) {
+        const penaltyAmt = tx.grossAmount * 0.20;
+        return {
+          ...tx,
+          status: 'FROZEN_20%_PENALTY',
+          frozen: true,
+          penaltyApplied: true,
+          penaltyAmt: penaltyAmt,
+          netPayout: Math.max(0, tx.netPayout - penaltyAmt)
+        };
+      }
+      return tx;
+    }));
+
+    setRfqs(prev => prev.map(item => item.id === selectedRfq.id ? { ...item, status: '20% Penalty Freeze' } : item));
+
+    showToast('🚨 FRAUD DETECTED: Off-platform contact sharing detected! 20% Security Penalty Escrow Freeze enforced.', 'warning');
+  };
+
+  // Chat message send handler with Anti-Fraud Checks
+  const handleSendMessage = (textToSend = newMessage) => {
+    if (!textToSend.trim()) return;
+
+    const containsFraud = detectOffPlatformContact(textToSend);
+
+    // Append Message
     setChatMessages(prev => [
       ...prev,
       {
         sender: user ? user.name : 'Guest User',
-        text: newMessage,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        text: textToSend,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        flagged: containsFraud
       }
     ]);
+
+    if (containsFraud) {
+      handleSecurityPenaltyTrigger(textToSend);
+    }
+
     setNewMessage('');
   };
 
-  // Buyer locks escrow for selected RFQ
+  // Voice Input Speech Recognition Handler
+  const toggleSpeechRecognition = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      showToast('Speech recognition is not supported in this browser.', 'warning');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = chatLanguage === 'Urdu' ? 'ur-PK' : chatLanguage === 'Hindi' ? 'hi-IN' : chatLanguage === 'Chinese' ? 'zh-CN' : chatLanguage === 'Arabic' ? 'ar-SA' : 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      showToast('Listening... Speak your RFQ terms or response.', 'info');
+    };
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setIsListening(false);
+      setNewMessage(transcript);
+      showToast(`Voice transcribed: "${transcript}"`, 'success');
+      
+      if (detectOffPlatformContact(transcript)) {
+        handleSecurityPenaltyTrigger(transcript);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(false);
+      showToast('Voice recognition error. Try again.', 'warning');
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
+
+  // Buyer locks escrow for selected RFQ using EXACT TIERED COMMISSION STRUCTURE
   const handleDepositEscrow = (rfq) => {
     const rawVal = parseFloat(rfq.budget.replace(/[^0-9.]/g, '')) || 10000;
-    const commPct = 2.5;
-    const commAmt = (rawVal * commPct) / 100;
-    const net = rawVal - commAmt;
+    
+    // Exact Tiered Commission Calculation:
+    // Below $10k: 5%, $10k-$100k: 3%, Above $100k: 1%
+    const { pct, amt, net } = calculateTieredCommission(rawVal);
 
     const newTx = {
       id: `ESC-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -239,20 +417,26 @@ export default function App() {
       supplierId: rfq.supplierId,
       supplierWallet: '1098374211',
       grossAmount: rawVal,
-      commissionPct: commPct,
-      commissionAmt: commAmt,
+      commissionPct: pct,
+      commissionAmt: amt,
       netPayout: net,
       status: 'HELD_IN_ESCROW',
+      frozen: false,
+      penaltyApplied: false,
       timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19) + ' UTC'
     };
 
     setEscrowTxs(prev => [newTx, ...prev]);
     setRfqs(prev => prev.map(item => item.id === rfq.id ? { ...item, status: 'Escrow Locked', escrowDeposited: true } : item));
-    showToast(`$${rawVal.toLocaleString()} USDT deposited into Admin Escrow (ID: 1232772030)`, 'success');
+    showToast(`$${rawVal.toLocaleString()} USDT deposited. Tiered Fee (${pct}%): $${amt.toLocaleString()} USDT.`, 'success');
   };
 
-  // Admin Payout Release
+  // Admin Payout Release with Verification
   const handleReleasePayout = (txId) => {
+    if (!isAdminAuthorized) {
+      showToast('Unauthorized: Admin rights required.', 'warning');
+      return;
+    }
     setEscrowTxs(prev => prev.map(tx => tx.id === txId ? { ...tx, status: 'RELEASED' } : tx));
     showToast(`Escrow ${txId} released! Net payout dispatched to supplier wallet.`, 'success');
   };
@@ -266,6 +450,25 @@ export default function App() {
     }
     setKycSubmitted(true);
     showToast('Fast-Track Verification request submitted to Admin Vault.', 'success');
+  };
+
+  // Filtered Suppliers for Directory
+  const filteredSuppliers = suppliers.filter(sup => {
+    const matchesSearch = sup.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          sup.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          sup.region.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'All' || sup.category === selectedCategory;
+    const matchesRegion = selectedRegion === 'All' || sup.region.includes(selectedRegion);
+    return matchesSearch && matchesCategory && matchesRegion;
+  });
+
+  // Translation helper for chat UI
+  const renderTranslatedText = (text) => {
+    if (!autoTranslateEnabled || chatLanguage === 'English') return text;
+    if (MOCK_TRANSLATIONS[chatLanguage] && MOCK_TRANSLATIONS[chatLanguage][text]) {
+      return MOCK_TRANSLATIONS[chatLanguage][text];
+    }
+    return `[${chatLanguage} Auto-Translated]: ${text}`;
   };
 
   return (
@@ -289,7 +492,7 @@ export default function App() {
             <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-emerald-400 bg-clip-text text-transparent">
               GHOURI <span className="text-emerald-400">B2B</span>
             </span>
-            <span className="block text-[10px] tracking-widest text-slate-400 font-mono -mt-1">GLOBAL WHOLESALE ESCROW</span>
+            <span className="block text-[10px] tracking-widest text-slate-400 font-mono -mt-1">GLOBAL WHOLESALE MARKETPLACE</span>
           </div>
         </div>
 
@@ -297,11 +500,11 @@ export default function App() {
         <nav className="hidden lg:flex items-center gap-1 bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/80">
           {[
             { id: 'landing', label: 'Home / Hub', icon: Layers },
-            { id: 'marketplace', label: 'Marketplace', icon: Building },
+            { id: 'marketplace', label: 'Marketplace Directory', icon: Building },
             { id: 'rfq', label: 'RFQ & Escrow Chat', icon: MessageSquare },
             { id: 'kyc', label: 'Fast-Track KYC ($100)', icon: ShieldCheck },
-            { id: 'logistics', label: 'Logistics Partner', icon: Truck },
-            { id: 'admin', label: 'Admin Audit Vault', icon: Lock }
+            { id: 'logistics', label: 'Logistics Network', icon: Truck },
+            { id: 'admin', label: 'Admin Audit Vault', icon: Lock, protected: true }
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -317,6 +520,11 @@ export default function App() {
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
                 {tab.label}
+                {tab.protected && (
+                  <span className="ml-1 text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.2 rounded-full font-mono">
+                    ADMIN
+                  </span>
+                )}
               </button>
             );
           })}
@@ -394,20 +602,20 @@ export default function App() {
 
               <div className="max-w-2xl space-y-6 relative z-10">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-medium">
-                  <ShieldCheck className="w-4 h-4" /> Hardcoded Binance Pay Escrow Protection
+                  <ShieldCheck className="w-4 h-4" /> Multi-Sig Binance Pay Escrow Protection
                 </div>
                 <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight text-white">
-                  The World's Best Global Wholesale <span className="bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent">B2B Marketplace</span>
+                  Global Wholesale <span className="bg-gradient-to-r from-emerald-400 to-blue-400 bg-clip-text text-transparent">B2B Marketplace</span>
                 </h1>
                 <p className="text-slate-400 text-base md:text-lg leading-relaxed">
-                  Eliminate global cross-border trade friction. Execute bulk procurement backed by instant USDT TRC20 multi-sig escrow, anti-fraud locked negotiations, and $100 fast-track supplier verification.
+                  Eliminate global cross-border trade friction. Source from verified international manufacturers, inspect MOQ details across global regions, and execute bulk transactions via instant USDT multi-sig escrow with tiered commission fees.
                 </p>
                 <div className="flex flex-wrap items-center gap-4 justify-center md:justify-start pt-2">
                   <button 
                     onClick={() => setActiveTab('marketplace')}
                     className="px-6 py-3.5 rounded-xl bg-emerald-400 text-slate-950 font-bold text-sm hover:bg-emerald-300 transition flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                   >
-                    Explore Wholesale Catalog <ArrowRight className="w-4 h-4" />
+                    Explore Wholesale Directory <ArrowRight className="w-4 h-4" />
                   </button>
                   <button 
                     onClick={() => setActiveTab('kyc')}
@@ -433,10 +641,29 @@ export default function App() {
                     <Lock className="w-4 h-4 text-slate-500" />
                   </div>
                 </div>
-                <div className="pt-1 text-[11px] text-slate-400 leading-tight space-y-1">
-                  <p className="flex items-center gap-1 text-slate-300"><Check className="w-3.5 h-3.5 text-emerald-400" /> Standard Fee: 2.5% per deal</p>
-                  <p className="flex items-center gap-1 text-slate-300"><Check className="w-3.5 h-3.5 text-emerald-400" /> Guaranteed anti-fraud escrow lock</p>
-                  <p className="flex items-center gap-1 text-slate-300"><Check className="w-3.5 h-3.5 text-emerald-400" /> Automated digital PDF invoice</p>
+                
+                {/* TIERED COMMISSION DISPLAY BOX */}
+                <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+                  <span className="text-[10px] font-mono text-slate-400 block font-bold">TIERED ESCROW COMMISSION RATES:</span>
+                  <div className="text-[11px] text-slate-300 font-mono space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">&lt; $10,000:</span>
+                      <span className="text-emerald-400 font-bold">5% Fee</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">$10k - $100k:</span>
+                      <span className="text-emerald-400 font-bold">3% Fee</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">&gt; $100,000:</span>
+                      <span className="text-emerald-400 font-bold">1% Fee</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-1 text-[11px] text-slate-400 leading-tight space-y-1 border-t border-slate-800/80">
+                  <p className="flex items-center gap-1 text-slate-300"><Check className="w-3.5 h-3.5 text-emerald-400" /> Anti-fraud AI chat & voice surveillance</p>
+                  <p className="flex items-center gap-1 text-slate-300"><Check className="w-3.5 h-3.5 text-emerald-400" /> 20% security penalty off-platform freeze</p>
                 </div>
               </div>
             </div>
@@ -447,9 +674,9 @@ export default function App() {
                 <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Locked Anti-Fraud RFQ Chat</h3>
+                <h3 className="text-lg font-bold text-white">Verified Factory Suppliers</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Negotiate directly with factories. Platform surveillance blocks illegal off-site transfers with a enforced 20% penalty audit mechanism.
+                  Source with complete confidence. Every supplier is rigorously audited across factory regions including China, Germany, Japan, and Pakistan.
                 </p>
               </div>
 
@@ -457,9 +684,9 @@ export default function App() {
                 <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                   <Award className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-white">$100 Priority Fast-Track KYC</h3>
+                <h3 className="text-lg font-bold text-white">Transparent MOQ & Lead Times</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Skip the 14-day manual backlog. Pay $100 directly to Admin Vault for priority 24-hour verification, unlocking Gold supplier badges.
+                  Clear wholesale terms with visible Minimum Order Quantities (MOQ), production lead times, and tier ratings for optimal procurement.
                 </p>
               </div>
 
@@ -467,9 +694,9 @@ export default function App() {
                 <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
                   <Truck className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-white">Global Freight Logistics Hub</h3>
+                <h3 className="text-lg font-bold text-white">Integrated Freight Logistics</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Seamlessly bridge ocean, air, and rail transit routes through our integrated freight partner network with built-in escrow milestones.
+                  Connect ocean, air, and overland shipments seamlessly through global freight partners linked directly to your active escrow orders.
                 </p>
               </div>
             </div>
@@ -482,82 +709,114 @@ export default function App() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800">
               <div>
                 <h2 className="text-2xl font-bold text-white">Global B2B Wholesale Directory</h2>
-                <p className="text-slate-400 text-sm">Source directly from audited factories and certified international manufacturers</p>
+                <p className="text-slate-400 text-sm">Source directly from audited international factories and verified manufacturers</p>
               </div>
               
-              {/* Search & Filter Bar */}
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1 md:w-72">
+              {/* Search & Filter Controls */}
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative flex-1 sm:w-64">
                   <Search className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
                   <input 
                     type="text" 
-                    placeholder="Search electronics, textiles..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search supplier, category, region..."
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500"
                   />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs font-semibold text-slate-300 hover:border-slate-700">
-                  <Filter className="w-4 h-4 text-slate-400" /> Filter
-                </button>
+
+                <select 
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="All">All Categories</option>
+                  <option value="Electronics & Hardware">Electronics & Hardware</option>
+                  <option value="Heavy Machinery & Parts">Heavy Machinery & Parts</option>
+                  <option value="Textiles & Raw Cotton">Textiles & Raw Cotton</option>
+                  <option value="Medical & Chemicals">Medical & Chemicals</option>
+                </select>
+
+                <select 
+                  value={selectedRegion}
+                  onChange={(e) => setSelectedRegion(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="All">All Factory Regions</option>
+                  <option value="China">China</option>
+                  <option value="Germany">Germany</option>
+                  <option value="Pakistan">Pakistan</option>
+                  <option value="Japan">Japan</option>
+                </select>
               </div>
             </div>
 
             {/* SUPPLIER GRID */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {suppliers.map((sup) => (
-                <div key={sup.id} className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4 hover:border-slate-700 transition">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-bold text-white">{sup.name}</h3>
-                        {sup.verified && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                            <CheckCircle className="w-3 h-3" /> VERIFIED
-                          </span>
-                        )}
+              {filteredSuppliers.map((sup) => (
+                <div key={sup.id} className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4 hover:border-slate-700 transition flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-white">{sup.name}</h3>
+                          {sup.verified && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                              <CheckCircle className="w-3 h-3" /> VERIFIED
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-emerald-400" /> {sup.region} • <span className="text-slate-300">{sup.category}</span>
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-400 mt-1">{sup.region} • <span className="text-slate-300">{sup.category}</span></p>
+                      <span className="px-3 py-1 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/30 text-xs font-semibold">
+                        {sup.tier}
+                      </span>
                     </div>
-                    <span className="px-3 py-1 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/30 text-xs font-semibold">
-                      {sup.tier}
-                    </span>
+
+                    <div className="grid grid-cols-3 gap-3 py-3 px-4 bg-slate-950/60 rounded-xl border border-slate-800/80 text-xs font-mono">
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">MOQ DETAIL</span>
+                        <span className="text-emerald-400 font-bold">{sup.moq}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">LEAD TIME</span>
+                        <span className="text-slate-200 font-bold">{sup.leadTime}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[10px]">COMPLETED</span>
+                        <span className="text-slate-200 font-bold">{sup.ordersCompleted} orders</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 py-3 px-4 bg-slate-950/60 rounded-xl border border-slate-800/80 text-xs font-mono">
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">MOQ</span>
-                      <span className="text-slate-200 font-bold">{sup.moq}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">LEAD TIME</span>
-                      <span className="text-slate-200 font-bold">{sup.leadTime}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-500 block text-[10px]">ORDERS</span>
-                      <span className="text-slate-200 font-bold">{sup.ordersCompleted} fulfilled</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/50">
                     <div className="text-xs text-slate-400 font-mono">
-                      Binance Pay Bound: <span className="text-emerald-400">{sup.wallet}</span>
+                      Escrow Wallet: <span className="text-emerald-400">{sup.wallet}</span>
                     </div>
                     <button 
                       onClick={() => {
                         setActiveTab('rfq');
                         showToast(`Opened RFQ Channel with ${sup.name}`, 'info');
                       }}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition flex items-center gap-2"
+                      className="px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition flex items-center gap-2"
                     >
-                      Request Quote <ChevronRight className="w-4 h-4" />
+                      Request Wholesale Quote <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
               ))}
+              {filteredSuppliers.length === 0 && (
+                <div className="col-span-2 text-center py-12 bg-slate-900/40 border border-slate-800 rounded-2xl text-slate-400">
+                  No suppliers match the selected search criteria. Try adjusting filters.
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* PAGE 3: RFQ NEGOTIATIONS & ESCROW PORTAL */}
+        {/* PAGE 3: RFQ NEGOTIATIONS & ESCROW PORTAL WITH SURVEILLANCE & AUTO-TRANSLATE */}
         {activeTab === 'rfq' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
@@ -581,9 +840,11 @@ export default function App() {
                     <div className="flex items-center justify-between text-xs font-mono text-slate-400">
                       <span>{rfq.id}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] ${
-                        rfq.escrowDeposited 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
-                          : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                        rfq.status.includes('Penalty') 
+                          ? 'bg-red-500/10 text-red-400 border border-red-500/30'
+                          : rfq.escrowDeposited 
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' 
+                            : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
                       }`}>
                         {rfq.status}
                       </span>
@@ -599,9 +860,26 @@ export default function App() {
             </div>
 
             {/* RIGHT: LOCKED CHAT & ESCROW DEPOSIT ACTION HUB */}
-            <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col h-[620px]">
+            <div className="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 flex flex-col h-[680px] relative">
               
-              {/* CHAT HEADER */}
+              {/* PERSISTENT AUTOMATED WARNING BANNER FOR SECURITY PENALTY */}
+              {fraudWarningBanner && fraudWarningBanner.rfqId === selectedRfq.id && (
+                <div className="mb-4 bg-red-950/80 border border-red-500/50 text-red-200 p-4 rounded-xl flex items-start justify-between gap-3 animate-pulse shadow-xl">
+                  <AlertOctagon className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1">
+                    <p className="font-bold text-red-400 text-sm">SECURITY AUDIT WARNING: Off-Platform Contact Detected!</p>
+                    <p>Flagged Content: <span className="font-mono bg-red-900/50 px-1.5 py-0.5 rounded text-white">"{fraudWarningBanner.detectedText}"</span></p>
+                    <p className="text-[11px] text-red-300">
+                      Automated <strong>20% Security Penalty Escrow Freeze</strong> has been enforced on this deal. Funds are locked for platform review.
+                    </p>
+                  </div>
+                  <button onClick={() => setFraudWarningBanner(null)} className="text-red-400 hover:text-white">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* CHAT HEADER & MULTI-LANGUAGE TRANSLATION CONTROLS */}
               <div className="border-b border-slate-800 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-2">
@@ -611,22 +889,52 @@ export default function App() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Buyer: <span className="text-slate-200">{selectedRfq.buyer}</span> • Assigned Supplier: <span className="text-slate-200">{selectedRfq.supplierId}</span>
+                    Buyer: <span className="text-slate-200">{selectedRfq.buyer}</span> • Supplier: <span className="text-slate-200">{selectedRfq.supplierId}</span>
                   </p>
                 </div>
 
-                {/* LOCK ESCROW BUTTON */}
-                <div>
+                {/* ESCROW & TRANSLATE TOOLBAR */}
+                <div className="flex flex-wrap items-center gap-2">
+                  
+                  {/* AUTO-TRANSLATE SELECTOR TOGGLE */}
+                  <div className="flex items-center gap-1.5 bg-slate-950 border border-slate-800 p-1 rounded-xl text-xs">
+                    <button 
+                      onClick={() => setAutoTranslateEnabled(!autoTranslateEnabled)}
+                      className={`px-2.5 py-1 rounded-lg font-semibold flex items-center gap-1 transition ${
+                        autoTranslateEnabled 
+                          ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' 
+                          : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Languages className="w-3.5 h-3.5" />
+                      {autoTranslateEnabled ? 'Auto-Translate On' : 'Translate'}
+                    </button>
+                    {autoTranslateEnabled && (
+                      <select 
+                        value={chatLanguage}
+                        onChange={(e) => setChatLanguage(e.target.value)}
+                        className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-200 focus:outline-none"
+                      >
+                        <option value="English">English</option>
+                        <option value="Urdu">Urdu (اردو)</option>
+                        <option value="Hindi">Hindi (हिंदी)</option>
+                        <option value="Chinese">Chinese (中文)</option>
+                        <option value="Arabic">Arabic (العربية)</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {/* LOCK ESCROW BUTTON */}
                   {selectedRfq.escrowDeposited ? (
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-xl text-emerald-400 text-xs font-mono">
-                      <Lock className="w-4 h-4" /> Escrow Locked in Admin Vault
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 px-3 py-1.5 rounded-xl text-emerald-400 text-xs font-mono">
+                      <Lock className="w-3.5 h-3.5" /> Escrow Locked
                     </div>
                   ) : (
                     <button 
                       onClick={() => handleDepositEscrow(selectedRfq)}
-                      className="px-5 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                      className="px-4 py-2 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-500/20"
                     >
-                      <CreditCard className="w-4 h-4" /> Deposit to Admin Escrow ({selectedRfq.budget})
+                      <CreditCard className="w-3.5 h-3.5" /> Lock Escrow
                     </button>
                   )}
                 </div>
@@ -640,40 +948,62 @@ export default function App() {
                     className={`p-3.5 rounded-2xl max-w-xl text-xs leading-relaxed ${
                       msg.sender === 'System' 
                         ? 'bg-blue-500/10 border border-blue-500/30 text-blue-300 mx-auto text-center w-full'
-                        : msg.sender === (user?.name || 'TechCore USA LLC')
-                          ? 'bg-emerald-500/10 border border-emerald-500/30 text-slate-200 ml-auto'
-                          : 'bg-slate-950 border border-slate-800 text-slate-300 mr-auto'
+                        : msg.flagged
+                          ? 'bg-red-950/40 border border-red-500/50 text-red-200 ml-auto'
+                          : msg.sender === (user?.name || 'TechCore USA LLC')
+                            ? 'bg-emerald-500/10 border border-emerald-500/30 text-slate-200 ml-auto'
+                            : 'bg-slate-950 border border-slate-800 text-slate-300 mr-auto'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-4 mb-1 text-[10px] font-mono text-slate-400">
-                      <span className="font-bold text-slate-300">{msg.sender}</span>
+                      <span className="font-bold text-slate-300 flex items-center gap-1">
+                        {msg.sender}
+                        {msg.flagged && <span className="text-red-400 font-bold">(FLAGGED FRAUD)</span>}
+                      </span>
                       <span>{msg.time}</span>
                     </div>
-                    <p>{msg.text}</p>
+                    <p>{renderTranslatedText(msg.text)}</p>
                   </div>
                 ))}
               </div>
 
-              {/* CHAT INPUT AREA */}
-              <div className="pt-2 flex items-center gap-3">
+              {/* CHAT & VOICE INPUT CONTROLS */}
+              <div className="pt-2 flex items-center gap-2">
+                
+                {/* VOICE SPEECH-TO-TEXT BUTTON */}
+                <button
+                  onClick={toggleSpeechRecognition}
+                  title="Voice Input (Speech-to-Text Surveillance)"
+                  className={`p-3 rounded-xl border transition ${
+                    isListening 
+                      ? 'bg-red-500 text-white border-red-400 animate-pulse' 
+                      : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                  }`}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4 text-emerald-400" />}
+                </button>
+
                 <input 
                   type="text" 
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Type negotiation details... (Off-platform contact sharing triggers 20% penalty audit)"
+                  placeholder={isListening ? "Listening to your voice..." : "Type or speak RFQ details... (Phone/Email triggers 20% security freeze)"}
                   className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
                 />
+
                 <button 
-                  onClick={handleSendMessage}
+                  onClick={() => handleSendMessage()}
                   className="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition flex items-center gap-2"
                 >
                   <Send className="w-4 h-4" /> Send
                 </button>
               </div>
 
-              <div className="mt-2 text-[10px] text-slate-400 text-center font-mono">
-                🔒 Protected by Ghouri Multi-Sig Surveillance • Admin Master Escrow Wallet ID: <span className="text-emerald-400">1232772030</span>
+              <div className="mt-2 text-[10px] text-slate-400 text-center font-mono flex items-center justify-center gap-2">
+                <span>🔒 Protected by Ghouri Voice/Text AI Surveillance</span>
+                <span>•</span>
+                <span>Tiered Commission Escrow Active</span>
               </div>
             </div>
           </div>
@@ -684,9 +1014,9 @@ export default function App() {
           <div className="max-w-3xl mx-auto space-y-8 py-4">
             <div className="text-center space-y-2">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
-                <ShieldCheck className="w-4 h-4" /> Instant VIP Trust Score Boost
+                <ShieldCheck className="w-4 h-4" /> Priority Gold Badge Verification
               </div>
-              <h2 className="text-3xl font-extrabold text-white">Priority Fast-Track KYC Verification</h2>
+              <h2 className="text-3xl font-extrabold text-white">Fast-Track KYC Audit & Verification</h2>
               <p className="text-slate-400 text-sm max-w-xl mx-auto">
                 Bypass standard manual processing backlogs. Deposit $100 USDT directly to the Master Admin Vault for priority 24-hour business auditing.
               </p>
@@ -843,92 +1173,110 @@ export default function App() {
           </div>
         )}
 
-        {/* PAGE 6: ADMIN SURVEILLANCE & PLATFORM AUDITING PANEL */}
+        {/* PAGE 6: ADMIN SURVEILLANCE & PLATFORM AUDITING PANEL (PROTECTED ROLE ACCESS) */}
         {activeTab === 'admin' && (
           <div className="space-y-6">
-            <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h2 className="text-2xl font-bold text-white">Admin Escrow Audit Vault</h2>
-                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs">
-                    SUPERADMIN ACCESS
-                  </span>
-                </div>
-                <p className="text-slate-400 text-sm mt-1">
-                  Master Wallet ID: <span className="font-mono text-emerald-400 font-bold">1232772030</span> • Real-time platform commission monitoring
+            {!isAdminAuthorized ? (
+              <div className="bg-slate-900/80 border border-amber-500/30 rounded-2xl p-8 text-center space-y-4 max-w-xl mx-auto my-12">
+                <ShieldAlert className="w-12 h-12 text-amber-400 mx-auto" />
+                <h3 className="text-xl font-bold text-white">Master Admin Access Required</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  This vault contains protected escrow funds, platform payout controls, and anti-fraud surveillance parameters. Please log in with an authorized admin account.
                 </p>
+                <button
+                  onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                  className="px-6 py-2.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-bold text-xs transition"
+                >
+                  Sign In as Admin
+                </button>
               </div>
+            ) : (
+              <>
+                <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-2xl font-bold text-white">Admin Escrow Audit Vault</h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-mono text-xs">
+                        SUPERADMIN AUTHORIZED
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-sm mt-1">
+                      Master Wallet ID: <span className="font-mono text-emerald-400 font-bold">1232772030</span> • Real-time platform commission monitoring
+                    </p>
+                  </div>
 
-              <div className="flex items-center gap-4 text-xs font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
-                <div>
-                  <span className="text-slate-500 block">TIERED COMMISSION</span>
-                  <span className="text-emerald-400 font-bold">2.5% Flat Rate</span>
+                  <div className="flex items-center gap-4 text-xs font-mono bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div>
+                      <span className="text-slate-500 block">TIERED COMMISSION RATES</span>
+                      <span className="text-emerald-400 font-bold">&lt;$10k: 5% | $10k-$100k: 3% | &gt;$100k: 1%</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="border-l border-slate-800 pl-4">
-                  <span className="text-slate-500 block">TOTAL IN VAULT</span>
-                  <span className="text-white font-bold">$120,000.00 USDT</span>
+
+                {/* INCOMING ESCROW TRANSACTIONS TABLE */}
+                <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-emerald-400" /> Escrow Transactions & Tiered Commission Audit
+                  </h3>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400">
+                          <th className="pb-3 font-semibold">ESCROW ID</th>
+                          <th className="pb-3 font-semibold">BUYER</th>
+                          <th className="pb-3 font-semibold">GROSS AMT</th>
+                          <th className="pb-3 font-semibold">TIERED FEE (%)</th>
+                          <th className="pb-3 font-semibold">FEE AMOUNT</th>
+                          <th className="pb-3 font-semibold">NET SUPPLIER PAYOUT</th>
+                          <th className="pb-3 font-semibold">STATUS</th>
+                          <th className="pb-3 font-semibold text-right">ACTION</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60 text-slate-300">
+                        {escrowTxs.map((tx) => (
+                          <tr key={tx.id} className="hover:bg-slate-800/30">
+                            <td className="py-4 font-bold text-white">{tx.id}</td>
+                            <td className="py-4">{tx.buyer}</td>
+                            <td className="py-4 text-slate-200">${tx.grossAmount.toLocaleString()} USDT</td>
+                            <td className="py-4 text-emerald-400 font-bold">{tx.commissionPct}%</td>
+                            <td className="py-4 text-emerald-400">${tx.commissionAmt.toLocaleString()} USDT</td>
+                            <td className="py-4 text-blue-400 font-bold">${tx.netPayout.toLocaleString()} USDT</td>
+                            <td className="py-4">
+                              <span className={`px-2.5 py-1 rounded-full text-[10px] ${
+                                tx.status === 'FROZEN_20%_PENALTY'
+                                  ? 'bg-red-500/10 text-red-400 border border-red-500/30 animate-pulse'
+                                  : tx.status === 'RELEASED'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
+                              }`}>
+                                {tx.status}
+                              </span>
+                            </td>
+                            <td className="py-4 text-right space-x-2">
+                              {tx.status === 'HELD_IN_ESCROW' && (
+                                <button
+                                  onClick={() => handleReleasePayout(tx.id)}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-sans font-bold text-xs transition"
+                                >
+                                  Release Payout
+                                </button>
+                              )}
+                              <button
+                                onClick={() => showToast(`Generated PDF Invoice for ${tx.id}`, 'info')}
+                                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-sans font-semibold text-xs transition inline-flex items-center gap-1"
+                              >
+                                <Download className="w-3 h-3" /> Invoice
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
-            </div>
-
-            {/* INCOMING ESCROW TRANSACTIONS TABLE */}
-            <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Lock className="w-4 h-4 text-emerald-400" /> Incoming Escrow & Release Controls
-              </h3>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-slate-400">
-                      <th className="pb-3 font-semibold">ESCROW ID</th>
-                      <th className="pb-3 font-semibold">BUYER</th>
-                      <th className="pb-3 font-semibold">GROSS AMT</th>
-                      <th className="pb-3 font-semibold">ADMIN FEE (2.5%)</th>
-                      <th className="pb-3 font-semibold">SUPPLIER PAYOUT</th>
-                      <th className="pb-3 font-semibold">STATUS</th>
-                      <th className="pb-3 font-semibold text-right">ACTION</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                    {escrowTxs.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-slate-800/30">
-                        <td className="py-4 font-bold text-white">{tx.id}</td>
-                        <td className="py-4">{tx.buyer}</td>
-                        <td className="py-4 text-slate-200">${tx.grossAmount.toLocaleString()} USDT</td>
-                        <td className="py-4 text-emerald-400">${tx.commissionAmt.toLocaleString()} USDT</td>
-                        <td className="py-4 text-blue-400">${tx.netPayout.toLocaleString()} USDT</td>
-                        <td className="py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[10px] ${
-                            tx.status === 'RELEASED'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-blue-500/10 text-blue-400 border border-blue-500/30'
-                          }`}>
-                            {tx.status}
-                          </span>
-                        </td>
-                        <td className="py-4 text-right space-x-2">
-                          {tx.status === 'HELD_IN_ESCROW' && (
-                            <button
-                              onClick={() => handleReleasePayout(tx.id)}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-sans font-bold text-xs transition"
-                            >
-                              Release Payout
-                            </button>
-                          )}
-                          <button
-                            onClick={() => showToast(`Generated PDF Invoice for ${tx.id}`, 'info')}
-                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-sans font-semibold text-xs transition inline-flex items-center gap-1"
-                          >
-                            <Download className="w-3 h-3" /> Invoice
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
 
@@ -978,7 +1326,7 @@ export default function App() {
                   required
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="e.g. procurement@company.com"
+                  placeholder="e.g. procurement@company.com or admin@ghouri.com"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
                 />
               </div>
@@ -1016,7 +1364,7 @@ export default function App() {
 
       {/* FOOTER */}
       <footer className="border-t border-slate-800/80 bg-slate-950 py-6 px-6 text-center text-xs text-slate-500 font-mono">
-        GHOURI B2B GLOBAL WHOLESALE ESCROW • ADMIN MASTER WALLET ID: <span className="text-emerald-400 font-bold">1232772030</span> • ALL RIGHTS RESERVED
+        GHOURI B2B GLOBAL WHOLESALE ESCROW • MASTER ADMIN WALLET ID: <span className="text-emerald-400 font-bold">1232772030</span> • ALL RIGHTS RESERVED
       </footer>
 
     </div>
